@@ -1,0 +1,11 @@
+language: go
+go:
+  - 1.10.x
+  - master
+install:
+  - go get -t ./...
+  - go get -u gopkg.in/alecthomas/gometalinter.v1
+  - gometalinter.v1 --install
+script:
+  - gometalinter.v1 --fast --deadline=1m --exclude=_test
+  - go test
