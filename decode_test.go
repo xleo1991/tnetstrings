@@ -34,7 +34,7 @@ func TestDecoder_Decode_string(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:foo,",
-			err:   TypeMismatch{Type: 'o', Kind: reflect.String},
+			err:   ErrTypeMismatch{Tag: 'o', Type: reflect.TypeOf("")},
 		},
 	}
 
@@ -82,7 +82,7 @@ func TestDecoder_Decode_int(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:123#",
-			err:   TypeMismatch{Type: '3', Kind: reflect.Int},
+			err:   ErrTypeMismatch{Tag: '3', Type: reflect.TypeOf(0)},
 		},
 	}
 
@@ -130,7 +130,7 @@ func TestDecoder_Decode_uint(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:123#",
-			err:   TypeMismatch{Type: '3', Kind: reflect.Uint},
+			err:   ErrTypeMismatch{Tag: '3', Type: reflect.TypeOf(uint(0))},
 		},
 	}
 
@@ -178,7 +178,7 @@ func TestDecoder_Decode_float32(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:.123^",
-			err:   TypeMismatch{Type: '2', Kind: reflect.Float32},
+			err:   ErrTypeMismatch{Tag: '2', Type: reflect.TypeOf(float32(.0))},
 		},
 	}
 
@@ -226,7 +226,7 @@ func TestDecoder_Decode_bool(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:false!",
-			err:   TypeMismatch{Type: 'l', Kind: reflect.Bool},
+			err:   ErrTypeMismatch{Tag: 'l', Type: reflect.TypeOf(false)},
 		},
 	}
 
@@ -309,7 +309,7 @@ func TestDecoder_Decode_map(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,}",
-			err:   TypeMismatch{Type: 'f', Kind: reflect.Map},
+			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf(map[string]interface{}{})},
 		},
 	}
 
@@ -358,7 +358,7 @@ func TestDecoder_Decode_struct(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,}",
-			err:   TypeMismatch{Type: 'f', Kind: reflect.Struct},
+			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf(S{})},
 		},
 	}
 
@@ -419,7 +419,7 @@ func TestDecoder_Decode_array(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,]",
-			err:   TypeMismatch{Type: 'f', Kind: reflect.Array},
+			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf([2]string{})},
 		},
 	}
 
@@ -481,7 +481,7 @@ func TestDecoder_Decode_slice(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,]",
-			err:   TypeMismatch{Type: 'f', Kind: reflect.Slice},
+			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf([]string{})},
 		},
 	}
 

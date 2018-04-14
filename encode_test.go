@@ -179,7 +179,7 @@ func TestEncoder_Encode(t *testing.T) {
 		{
 			title: "unsupported type (complex128)",
 			in:    1i,
-			err:   UnsupportedType{Kind: reflect.Complex128},
+			err:   ErrUnsupportedType{Type: reflect.TypeOf(0i)},
 		},
 	}
 

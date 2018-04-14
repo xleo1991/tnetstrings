@@ -3,8 +3,6 @@ package tnetstrings
 import (
 	"bufio"
 	"bytes"
-	"errors"
-	"fmt"
 	"io"
 	"reflect"
 	"strconv"
@@ -13,44 +11,19 @@ import (
 
 const limit = 10
 
-var SizeLimitExceeded = errors.New("size limit exceeded")
-
-type TypeMismatch struct {
-	Type uint8
-	Kind reflect.Kind
+// NewDecoder returns a new Decoder instance.
+func NewDecoder(r io.Reader) *Decoder {
+	return &Decoder{Reader: bufio.NewReader(r)}
 }
 
-func (t TypeMismatch) Error() string {
-	return fmt.Sprintf("type mismatch: %s, %v", string(t.Type), t.Kind)
-}
-
-type InvalidType struct {
-	reflect.Type
-}
-
-func (i InvalidType) Error() string {
-	return fmt.Sprintf("invalid type: %v", i.Type)
-}
-
-type SyntaxError struct {
-	Offset uint64
-}
-
-func (s SyntaxError) Error() string {
-	return fmt.Sprintf("syntax error: %d", s.Offset)
-}
-
-type Decoder struct {
-	*bufio.Reader
-}
-
+// Decode decodes a tnetstring from the stream.
 func (d *Decoder) Decode(val interface{}) error {
 	size, err := d.size()
 	if err != nil {
 		return err
 	}
 	data := make([]uint8, size)
-	if _, err := io.ReadFull(d, data[:]); err != nil {
+	if _, err = io.ReadFull(d, data[:]); err != nil {
 		return err
 	}
 	t, err := d.ReadByte()
@@ -59,7 +32,7 @@ func (d *Decoder) Decode(val interface{}) error {
 	}
 	rv := reflect.ValueOf(val)
 	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return InvalidType{Type: rv.Type()}
+		return ErrUnsupportedType{Type: rv.Type()}
 	}
 	rv = reflect.Indirect(rv)
 
@@ -91,7 +64,7 @@ func (d *Decoder) Decode(val interface{}) error {
 			return err
 		}
 		rv.Set(reflect.ValueOf(f))
-	case  pair{t: '^', k: reflect.Float32}, pair{t: '^', k: reflect.Float64}:
+	case pair{t: '^', k: reflect.Float32}, pair{t: '^', k: reflect.Float64}:
 		f, err := strconv.ParseFloat(string(data), int(rv.Type().Size()))
 		if err != nil {
 			return err
@@ -112,7 +85,7 @@ func (d *Decoder) Decode(val interface{}) error {
 		} else {
 			m = reflect.MakeMap(rv.Type())
 		}
-		d := Decoder{Reader: bufio.NewReader(bytes.NewReader(data))}
+		d := NewDecoder(bytes.NewReader(data))
 		var key string
 		var val interface{}
 		for d.More() {
@@ -126,7 +99,7 @@ func (d *Decoder) Decode(val interface{}) error {
 		}
 		rv.Set(m)
 	case pair{t: '}', k: reflect.Struct}:
-		d := Decoder{Reader: bufio.NewReader(bytes.NewReader(data))}
+		d := NewDecoder(bytes.NewReader(data))
 		for d.More() {
 			var key string
 			if err := d.Decode(&key); err != nil {
@@ -137,7 +110,7 @@ func (d *Decoder) Decode(val interface{}) error {
 			}
 		}
 	case pair{t: ']', k: reflect.Array}:
-		d := Decoder{Reader: bufio.NewReader(bytes.NewReader(data))}
+		d := NewDecoder(bytes.NewReader(data))
 		for i := 0; i < rv.Len(); i++ {
 			if !d.More() {
 				rv.Index(i).Set(reflect.Zero(rv.Type().Elem()))
@@ -155,7 +128,7 @@ func (d *Decoder) Decode(val interface{}) error {
 			s = reflect.MakeSlice(rv.Type(), 0, strings.Count(string(data), ":"))
 		}
 
-		d := Decoder{Reader: bufio.NewReader(bytes.NewReader(data))}
+		d := NewDecoder(bytes.NewReader(data))
 		var e interface{}
 		for d.More() {
 			if err := d.Decode(&e); err != nil {
@@ -165,11 +138,12 @@ func (d *Decoder) Decode(val interface{}) error {
 		}
 		rv.Set(s)
 	default:
-		return TypeMismatch{Type: t, Kind: k}
+		return ErrTypeMismatch{Tag: t, Type: rv.Type()}
 	}
 	return nil
 }
 
+// More returns true iff the underlying stream can return more than 1 byte.
 func (d *Decoder) More() bool {
 	_, err := d.Reader.Peek(1)
 	return err == nil
@@ -179,7 +153,7 @@ func (d *Decoder) size() (uint64, error) {
 	var size uint64
 	for i := 0; i < limit; i++ {
 		if i == limit {
-			return 0, SizeLimitExceeded
+			return 0, ErrSizeLimitExceeded
 		}
 		b, err := d.ReadByte()
 		if err != nil {
