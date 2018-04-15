@@ -211,14 +211,26 @@ func decodeDictionaryMap(data []byte, rv reflect.Value) error {
 
 func decodeDictionaryStruct(data []byte, rv reflect.Value) error {
 	d := NewDecoder(bytes.NewReader(data))
+	tags := make(map[string]*tag, rv.NumField())
+	for i := 0; i < rv.NumField(); i++ {
+		tag := parseTag(rv.Type().Field(i))
+		if tag == nil {
+			continue
+		}
+		tags[tag.displayName] = tag
+	}
 	for d.More() {
 		var key string
 		if err := d.Decode(&key); err != nil {
 			return err
 		}
-		if err := d.Decode(rv.FieldByName(key).Addr().Interface()); err != nil {
+
+		var val interface{}
+		if err := d.Decode(&val); err != nil {
 			return err
 		}
+
+		rv.FieldByName(tags[key].name).Set(reflect.ValueOf(val))
 	}
 	return nil
 }

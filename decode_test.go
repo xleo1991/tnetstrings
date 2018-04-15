@@ -328,26 +328,33 @@ func TestDecoder_Decode_map(t *testing.T) {
 }
 
 func TestDecoder_Decode_struct(t *testing.T) {
-	type S struct {
-		Foo string
+	type s struct {
+		NoTag          string
+		Ignored        string `tnetstrings:"-"`
+		Named          string `tnetstrings:"foo"`
+		OmitEmpty      string `tnetstrings:",omitempty"`
+		NamedOmitEmpty string `tnetstrings:"bar,omitempty"`
 	}
 
 	testCases := []struct {
 		title string
 		in    string
-		out   S
+		out   s
 		err   error
 	}{
 		{
 			title: "empty",
 			in:    "0:}",
-			out:   S{},
+			out:   s{},
 		},
 		{
 			title: "just",
-			in:    "12:3:Foo,3:bar,}",
-			out: S{
-				Foo: "bar",
+			in:    "62:5:NoTag,3:bar,3:foo,3:foo,9:OmitEmpty,9:OmitEmpty,3:bar,3:bar,}",
+			out: s{
+				NoTag:          "bar",
+				Named:          "foo",
+				OmitEmpty:      "OmitEmpty",
+				NamedOmitEmpty: "bar",
 			},
 		},
 		{
@@ -366,7 +373,7 @@ func TestDecoder_Decode_struct(t *testing.T) {
 		d := Decoder{
 			Reader: bufio.NewReader(bytes.NewReader([]byte(tc.in))),
 		}
-		var s S
+		var s s
 		if err := d.Decode(&s); err != nil && !reflect.DeepEqual(tc.err, err) {
 			t.Errorf("[%s] expected: %v, got: %v", tc.title, tc.err, err)
 		}

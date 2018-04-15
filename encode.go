@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"sort"
 	"strconv"
-	"strings"
 )
 
 // Encoder is a streaming tnetstrings encoder.
@@ -79,44 +78,29 @@ func (e *Encoder) encodeStruct(v reflect.Value) error {
 	var buf bytes.Buffer
 	f := NewEncoder(&buf)
 	for i := 0; i < v.NumField(); i++ {
-		name, val, ok := field(v, i)
-		if !ok {
+		ft := v.Type().Field(i)
+		fv := v.Field(i)
+		if !fv.CanInterface() {
 			continue
 		}
 
-		if err := f.Encode(name); err != nil {
+		tag := parseTag(ft)
+		if tag == nil {
+			continue
+		}
+		if tag.omitEmpty && fv == reflect.Zero(ft.Type) {
+			continue
+		}
+
+		if err := f.Encode(tag.displayName); err != nil {
 			return err
 		}
-		if err := f.Encode(val); err != nil {
+		if err := f.Encode(fv.Interface()); err != nil {
 			return err
 		}
 	}
 	_, err := fmt.Fprintf(e, "%d:%s}", buf.Len(), buf.Bytes())
 	return err
-}
-
-func field(v reflect.Value, i int) (string, interface{}, bool) {
-	t := v.Type().Field(i)
-	fv := v.Field(i)
-
-	if !fv.CanInterface() {
-		return "", nil, false
-	}
-
-	name := t.Name
-	if tag, ok := t.Tag.Lookup("tnetstrings"); ok {
-		if tag == "-" {
-			return "", nil, false
-		}
-		ts := strings.Split(tag, ",")
-		if len(ts) > 0 && ts[0] != "" {
-			name = ts[0]
-		}
-		if len(ts) > 1 && ts[1] == "omitempty" && fv == reflect.Zero(t.Type) {
-			return "", nil, false
-		}
-	}
-	return name, fv.Interface(), true
 }
 
 func (e *Encoder) encodeSlice(v reflect.Value) error {
