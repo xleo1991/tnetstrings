@@ -15,6 +15,11 @@ type Encoder struct {
 	io.Writer
 }
 
+// NewEncoder returns a new Encoder instance.
+func NewEncoder(w io.Writer) *Encoder {
+	return &Encoder{Writer: w}
+}
+
 // Encode encodes a value into tnetstring.
 func (e *Encoder) Encode(val interface{}) error {
 	v := reflect.ValueOf(val)
@@ -53,9 +58,7 @@ func (e *Encoder) Encode(val interface{}) error {
 
 func (e *Encoder) encodeMap(v reflect.Value) error {
 	var buf bytes.Buffer
-	f := Encoder{
-		Writer: &buf,
-	}
+	f := NewEncoder(&buf)
 	ks := v.MapKeys()
 	sort.Slice(ks, func(i, j int) bool {
 		return ks[i].String() < ks[j].String()
@@ -74,9 +77,7 @@ func (e *Encoder) encodeMap(v reflect.Value) error {
 
 func (e *Encoder) encodeStruct(v reflect.Value) error {
 	var buf bytes.Buffer
-	f := Encoder{
-		Writer: &buf,
-	}
+	f := NewEncoder(&buf)
 	for i := 0; i < v.NumField(); i++ {
 		name, val, ok := field(v, i)
 		if !ok {
@@ -125,9 +126,7 @@ func (e *Encoder) encodeSlice(v reflect.Value) error {
 		return err
 	}
 	var buf bytes.Buffer
-	f := Encoder{
-		Writer: &buf,
-	}
+	f := NewEncoder(&buf)
 	for i := 0; i < v.Len(); i++ {
 		if err := f.Encode(v.Index(i).Interface()); err != nil {
 			return err

@@ -185,10 +185,7 @@ func TestEncoder_Encode(t *testing.T) {
 
 	for _, tc := range testCases {
 		var buf bytes.Buffer
-		e := Encoder{
-			Writer: &buf,
-		}
-
+		e := NewEncoder(&buf)
 		if err := e.Encode(tc.in); err != tc.err {
 			t.Error(err)
 		}
