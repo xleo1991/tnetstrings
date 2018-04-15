@@ -11,6 +11,11 @@ import (
 
 const limit = 10
 
+// Decoder is a streaming tnetstrings decoder.
+type Decoder struct {
+	*bufio.Reader
+}
+
 // NewDecoder returns a new Decoder instance.
 func NewDecoder(r io.Reader) *Decoder {
 	return &Decoder{Reader: bufio.NewReader(r)}
@@ -22,125 +27,31 @@ func (d *Decoder) Decode(val interface{}) error {
 	if err != nil {
 		return err
 	}
-	data := make([]uint8, size)
+	data := make([]uint8, size+1)
 	if _, err = io.ReadFull(d, data[:]); err != nil {
 		return err
 	}
-	t, err := d.ReadByte()
-	if err != nil {
-		return err
-	}
-	rv := reflect.ValueOf(val)
-	if rv.Kind() != reflect.Ptr || rv.IsNil() {
-		return ErrUnsupportedType{Type: rv.Type()}
-	}
-	rv = reflect.Indirect(rv)
 
-	k := rv.Kind()
-	switch (pair{t: t, k: k}) {
-	case pair{t: ',', k: reflect.Interface}, pair{t: ',', k: reflect.String}:
-		rv.Set(reflect.ValueOf(string(data)))
-	case pair{t: '#', k: reflect.Interface}:
-		i, err := strconv.ParseInt(string(data), 0, 64)
-		if err != nil {
-			return err
-		}
-		rv.Set(reflect.ValueOf(i))
-	case pair{t: '#', k: reflect.Int}, pair{t: '#', k: reflect.Int8}, pair{t: '#', k: reflect.Int16}, pair{t: '#', k: reflect.Int32}, pair{t: '#', k: reflect.Int64}:
-		i, err := strconv.ParseInt(string(data), 0, int(rv.Type().Size()))
-		if err != nil {
-			return err
-		}
-		rv.SetInt(i)
-	case pair{t: '#', k: reflect.Uint}, pair{t: '#', k: reflect.Uint8}, pair{t: '#', k: reflect.Uint16}, pair{t: '#', k: reflect.Uint32}, pair{t: '#', k: reflect.Uint64}:
-		i, err := strconv.ParseUint(string(data), 0, int(rv.Type().Size()))
-		if err != nil {
-			return err
-		}
-		rv.SetUint(i)
-	case pair{t: '^', k: reflect.Interface}:
-		f, err := strconv.ParseFloat(string(data), 64)
-		if err != nil {
-			return err
-		}
-		rv.Set(reflect.ValueOf(f))
-	case pair{t: '^', k: reflect.Float32}, pair{t: '^', k: reflect.Float64}:
-		f, err := strconv.ParseFloat(string(data), int(rv.Type().Size()))
-		if err != nil {
-			return err
-		}
-		rv.SetFloat(f)
-	case pair{t: '!', k: reflect.Interface}, pair{t: '!', k: reflect.Bool}:
-		b, err := strconv.ParseBool(string(data))
-		if err != nil {
-			return err
-		}
-		rv.Set(reflect.ValueOf(b))
-	case pair{t: '~', k: reflect.Interface}, pair{t: '~', k: reflect.Ptr}:
-		rv.Set(reflect.Zero(rv.Type()))
-	case pair{t: '}', k: reflect.Interface}, pair{t: '}', k: reflect.Map}:
-		var m reflect.Value
-		if k == reflect.Interface {
-			m = reflect.ValueOf(map[string]interface{}{})
-		} else {
-			m = reflect.MakeMap(rv.Type())
-		}
-		d := NewDecoder(bytes.NewReader(data))
-		var key string
-		var val interface{}
-		for d.More() {
-			if err := d.Decode(&key); err != nil {
-				return err
-			}
-			if err := d.Decode(&val); err != nil {
-				return err
-			}
-			m.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
-		}
-		rv.Set(m)
-	case pair{t: '}', k: reflect.Struct}:
-		d := NewDecoder(bytes.NewReader(data))
-		for d.More() {
-			var key string
-			if err := d.Decode(&key); err != nil {
-				return err
-			}
-			if err := d.Decode(rv.FieldByName(key).Addr().Interface()); err != nil {
-				return err
-			}
-		}
-	case pair{t: ']', k: reflect.Array}:
-		d := NewDecoder(bytes.NewReader(data))
-		for i := 0; i < rv.Len(); i++ {
-			if !d.More() {
-				rv.Index(i).Set(reflect.Zero(rv.Type().Elem()))
-				continue
-			}
-			if err := d.Decode(rv.Index(i).Addr().Interface()); err != nil {
-				return err
-			}
-		}
-	case pair{t: ']', k: reflect.Interface}, pair{t: ']', k: reflect.Slice}:
-		var s reflect.Value
-		if k == reflect.Interface {
-			s = reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, strings.Count(string(data), ":"))
-		} else {
-			s = reflect.MakeSlice(rv.Type(), 0, strings.Count(string(data), ":"))
-		}
-
-		d := NewDecoder(bytes.NewReader(data))
-		var e interface{}
-		for d.More() {
-			if err := d.Decode(&e); err != nil {
-				return err
-			}
-			s = reflect.Append(s, reflect.ValueOf(e))
-		}
-		rv.Set(s)
-	default:
-		return ErrTypeMismatch{Tag: t, Type: rv.Type()}
+	t := data[len(data)-1]
+	data = data[:len(data)-1]
+	rv := reflect.Indirect(reflect.ValueOf(val))
+	switch t {
+	case ',':
+		return decodeString(data, rv)
+	case '#':
+		return decodeInteger(data, rv)
+	case '^':
+		return decodeFloat(data, rv)
+	case '!':
+		return decodeBool(data, rv)
+	case '~':
+		return decodeNull(data, rv)
+	case '}':
+		return decodeDictionary(data, rv)
+	case ']':
+		return decodeList(data, rv)
 	}
-	return nil
+	return ErrInvalidTypeChar(t)
 }
 
 // More returns true iff the underlying stream can return more than 1 byte.
@@ -152,25 +63,217 @@ func (d *Decoder) More() bool {
 func (d *Decoder) size() (uint64, error) {
 	var size uint64
 	for i := 0; i < limit; i++ {
-		if i == limit {
-			return 0, ErrSizeLimitExceeded
-		}
 		b, err := d.ReadByte()
 		if err != nil {
 			return 0, err
 		}
-		if ':' == b {
-			break
-		}
-		if '0' <= b && '9' >= b {
+		switch b {
+		case ':':
+			return size, nil
+		case '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
 			size = 10*size + uint64(b-'0')
+		default:
+			return 0, ErrInvalidSizeChar(b)
 		}
-		// TODO: check invalid bytes
 	}
-	return size, nil
+	return 0, ErrSizeLimitExceeded
 }
 
-type pair struct {
-	t uint8
-	k reflect.Kind
+func decodeString(data []byte, rv reflect.Value) error {
+	switch rv.Kind() {
+	case reflect.Interface, reflect.String:
+		rv.Set(reflect.ValueOf(string(data)))
+		return nil
+	default:
+		return ErrUnsupportedType{Type: rv.Type()}
+	}
+}
+
+func decodeInteger(data []byte, rv reflect.Value) error {
+	switch rv.Kind() {
+	case reflect.Interface:
+		i, err := strconv.ParseInt(string(data), 0, 64)
+		if err != nil {
+			return err
+		}
+		rv.Set(reflect.ValueOf(i))
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		i, err := strconv.ParseInt(string(data), 0, int(rv.Type().Size()))
+		if err != nil {
+			return err
+		}
+		rv.SetInt(i)
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		i, err := strconv.ParseUint(string(data), 0, int(rv.Type().Size()))
+		if err != nil {
+			return err
+		}
+		rv.SetUint(i)
+	default:
+		return ErrUnsupportedType{Type: rv.Type()}
+	}
+	return nil
+}
+
+func decodeFloat(data []byte, rv reflect.Value) error {
+	switch rv.Kind() {
+	case reflect.Interface:
+		f, err := strconv.ParseFloat(string(data), 64)
+		if err != nil {
+			return err
+		}
+		rv.Set(reflect.ValueOf(f))
+	case reflect.Float32, reflect.Float64:
+		f, err := strconv.ParseFloat(string(data), int(rv.Type().Size()))
+		if err != nil {
+			return err
+		}
+		rv.SetFloat(f)
+	default:
+		return ErrUnsupportedType{Type: rv.Type()}
+	}
+	return nil
+}
+
+func decodeBool(data []byte, rv reflect.Value) error {
+	switch rv.Kind() {
+	case reflect.Interface:
+		b, err := strconv.ParseBool(string(data))
+		if err != nil {
+			return err
+		}
+		rv.Set(reflect.ValueOf(b))
+	case reflect.Bool:
+		b, err := strconv.ParseBool(string(data))
+		if err != nil {
+			return err
+		}
+		rv.SetBool(b)
+	default:
+		return ErrUnsupportedType{Type: rv.Type()}
+	}
+	return nil
+}
+
+func decodeNull(_ []byte, rv reflect.Value) error {
+	rv.Set(reflect.Zero(rv.Type()))
+	return nil
+}
+
+func decodeDictionary(data []byte, rv reflect.Value) error {
+	switch rv.Kind() {
+	case reflect.Interface:
+		return decodeDictionaryInterface(data, rv)
+	case reflect.Map:
+		return decodeDictionaryMap(data, rv)
+	case reflect.Struct:
+		return decodeDictionaryStruct(data, rv)
+	default:
+		return ErrUnsupportedType{Type: rv.Type()}
+	}
+}
+
+func decodeDictionaryInterface(data []byte, rv reflect.Value) error {
+	m := reflect.ValueOf(map[string]interface{}{})
+	d := NewDecoder(bytes.NewReader(data))
+	var key string
+	var val interface{}
+	for d.More() {
+		if err := d.Decode(&key); err != nil {
+			return err
+		}
+		if err := d.Decode(&val); err != nil {
+			return err
+		}
+		m.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
+	}
+	rv.Set(m)
+	return nil
+}
+
+func decodeDictionaryMap(data []byte, rv reflect.Value) error {
+	m := reflect.MakeMap(rv.Type())
+	d := NewDecoder(bytes.NewReader(data))
+	var key string
+	var val interface{}
+	for d.More() {
+		if err := d.Decode(&key); err != nil {
+			return err
+		}
+		if err := d.Decode(&val); err != nil {
+			return err
+		}
+		m.SetMapIndex(reflect.ValueOf(key), reflect.ValueOf(val))
+	}
+	rv.Set(m)
+	return nil
+}
+
+func decodeDictionaryStruct(data []byte, rv reflect.Value) error {
+	d := NewDecoder(bytes.NewReader(data))
+	for d.More() {
+		var key string
+		if err := d.Decode(&key); err != nil {
+			return err
+		}
+		if err := d.Decode(rv.FieldByName(key).Addr().Interface()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decodeList(data []byte, rv reflect.Value) error {
+	switch rv.Kind() {
+	case reflect.Array:
+		return decodeListArray(data, rv)
+	case reflect.Interface:
+		return decodeListInterface(data, rv)
+	case reflect.Slice:
+		return decodeListSlice(data, rv)
+	default:
+		return ErrUnsupportedType{Type: rv.Type()}
+	}
+}
+
+func decodeListArray(data []byte, rv reflect.Value) error {
+	d := NewDecoder(bytes.NewReader(data))
+	for i := 0; i < rv.Len(); i++ {
+		if !d.More() {
+			rv.Index(i).Set(reflect.Zero(rv.Type().Elem()))
+			continue
+		}
+		if err := d.Decode(rv.Index(i).Addr().Interface()); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func decodeListInterface(data []byte, rv reflect.Value) error {
+	s := reflect.MakeSlice(reflect.TypeOf([]interface{}{}), 0, strings.Count(string(data), ":"))
+	d := NewDecoder(bytes.NewReader(data))
+	var e interface{}
+	for d.More() {
+		if err := d.Decode(&e); err != nil {
+			return err
+		}
+		s = reflect.Append(s, reflect.ValueOf(e))
+	}
+	rv.Set(s)
+	return nil
+}
+
+func decodeListSlice(data []byte, rv reflect.Value) error {
+	s := reflect.MakeSlice(rv.Type(), 0, strings.Count(string(data), ":"))
+	d := NewDecoder(bytes.NewReader(data))
+	var e interface{}
+	for d.More() {
+		if err := d.Decode(&e); err != nil {
+			return err
+		}
+		s = reflect.Append(s, reflect.ValueOf(e))
+	}
+	rv.Set(s)
+	return nil
 }

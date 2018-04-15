@@ -34,7 +34,7 @@ func TestDecoder_Decode_string(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:foo,",
-			err:   ErrTypeMismatch{Tag: 'o', Type: reflect.TypeOf("")},
+			err:   ErrInvalidTypeChar('o'),
 		},
 	}
 
@@ -82,7 +82,7 @@ func TestDecoder_Decode_int(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:123#",
-			err:   ErrTypeMismatch{Tag: '3', Type: reflect.TypeOf(0)},
+			err:   ErrInvalidTypeChar('3'),
 		},
 	}
 
@@ -130,7 +130,7 @@ func TestDecoder_Decode_uint(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:123#",
-			err:   ErrTypeMismatch{Tag: '3', Type: reflect.TypeOf(uint(0))},
+			err:   ErrInvalidTypeChar('3'),
 		},
 	}
 
@@ -178,7 +178,7 @@ func TestDecoder_Decode_float32(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:.123^",
-			err:   ErrTypeMismatch{Tag: '2', Type: reflect.TypeOf(float32(.0))},
+			err:   ErrInvalidTypeChar('2'),
 		},
 	}
 
@@ -226,7 +226,7 @@ func TestDecoder_Decode_bool(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:false!",
-			err:   ErrTypeMismatch{Tag: 'l', Type: reflect.TypeOf(false)},
+			err:   ErrInvalidTypeChar('l'),
 		},
 	}
 
@@ -309,7 +309,7 @@ func TestDecoder_Decode_map(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,}",
-			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf(map[string]interface{}{})},
+			err:   ErrInvalidTypeChar('f'),
 		},
 	}
 
@@ -358,7 +358,7 @@ func TestDecoder_Decode_struct(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,}",
-			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf(S{})},
+			err:   ErrInvalidTypeChar('f'),
 		},
 	}
 
@@ -419,7 +419,7 @@ func TestDecoder_Decode_array(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,]",
-			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf([2]string{})},
+			err:   ErrInvalidTypeChar('f'),
 		},
 	}
 
@@ -481,7 +481,7 @@ func TestDecoder_Decode_slice(t *testing.T) {
 		{
 			title: "smaller size",
 			in:    "2:3:foo,3:bar,]",
-			err:   ErrTypeMismatch{Tag: 'f', Type: reflect.TypeOf([]string{})},
+			err:   ErrInvalidTypeChar('f'),
 		},
 	}
 

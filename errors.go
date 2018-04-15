@@ -1,7 +1,6 @@
 package tnetstrings
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
 	"reflect"
@@ -22,17 +21,16 @@ var ErrNonStringKey = errors.New("non string key")
 // ErrSizeLimitExceeded means SIZE is longer than 9 digits.
 var ErrSizeLimitExceeded = errors.New("size limit exceeded")
 
-// ErrTypeMismatch means no decoding is defined.
-type ErrTypeMismatch struct {
-	Tag  uint8
-	Type reflect.Type
+// ErrInvalidSizeChar means there's a non-digit character before `:`.
+type ErrInvalidSizeChar uint8
+
+func (e ErrInvalidSizeChar) Error() string {
+	return fmt.Sprintf("invalid size char: %s", string(e))
 }
 
-func (t ErrTypeMismatch) Error() string {
-	return fmt.Sprintf("type mismatch: %s, %v", string(t.Tag), t.Type)
-}
+// ErrInvalidTypeChar means the payload doesn't end with one of `,#^!~}]`.
+type ErrInvalidTypeChar uint8
 
-// Decoder is a streaming tnetstrings decoder.
-type Decoder struct {
-	*bufio.Reader
+func (e ErrInvalidTypeChar) Error() string {
+	return fmt.Sprintf("invalid type char: %s", string(e))
 }
