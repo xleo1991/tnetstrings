@@ -81,8 +81,14 @@ func (d *Decoder) size() (uint64, error) {
 
 func decodeString(data []byte, rv reflect.Value) error {
 	switch rv.Kind() {
-	case reflect.Interface, reflect.String:
+	case reflect.Interface:
+		if rv.Type().NumMethod() != 0 {
+			return ErrUnsupportedType{Type: rv.Type()}
+		}
 		rv.Set(reflect.ValueOf(string(data)))
+		return nil
+	case reflect.String:
+		rv.SetString(string(data))
 		return nil
 	default:
 		return ErrUnsupportedType{Type: rv.Type()}
@@ -92,6 +98,9 @@ func decodeString(data []byte, rv reflect.Value) error {
 func decodeInteger(data []byte, rv reflect.Value) error {
 	switch rv.Kind() {
 	case reflect.Interface:
+		if rv.Type().NumMethod() != 0 {
+			return ErrUnsupportedType{Type: rv.Type()}
+		}
 		i, err := strconv.ParseInt(string(data), 0, 64)
 		if err != nil {
 			return err
@@ -118,6 +127,9 @@ func decodeInteger(data []byte, rv reflect.Value) error {
 func decodeFloat(data []byte, rv reflect.Value) error {
 	switch rv.Kind() {
 	case reflect.Interface:
+		if rv.Type().NumMethod() != 0 {
+			return ErrUnsupportedType{Type: rv.Type()}
+		}
 		f, err := strconv.ParseFloat(string(data), 64)
 		if err != nil {
 			return err
@@ -138,6 +150,9 @@ func decodeFloat(data []byte, rv reflect.Value) error {
 func decodeBool(data []byte, rv reflect.Value) error {
 	switch rv.Kind() {
 	case reflect.Interface:
+		if rv.Type().NumMethod() != 0 {
+			return ErrUnsupportedType{Type: rv.Type()}
+		}
 		b, err := strconv.ParseBool(string(data))
 		if err != nil {
 			return err
@@ -163,6 +178,9 @@ func decodeNull(_ []byte, rv reflect.Value) error {
 func decodeDictionary(data []byte, rv reflect.Value) error {
 	switch rv.Kind() {
 	case reflect.Interface:
+		if rv.Type().NumMethod() != 0 {
+			return ErrUnsupportedType{Type: rv.Type()}
+		}
 		return decodeDictionaryInterface(data, rv)
 	case reflect.Map:
 		return decodeDictionaryMap(data, rv)
@@ -240,6 +258,9 @@ func decodeList(data []byte, rv reflect.Value) error {
 	case reflect.Array:
 		return decodeListArray(data, rv)
 	case reflect.Interface:
+		if rv.Type().NumMethod() != 0 {
+			return ErrUnsupportedType{Type: rv.Type()}
+		}
 		return decodeListInterface(data, rv)
 	case reflect.Slice:
 		return decodeListSlice(data, rv)
