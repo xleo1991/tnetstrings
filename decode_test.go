@@ -66,13 +66,13 @@ func TestDecoder_Decode_int(t *testing.T) {
 		},
 		{
 			title: "positive",
-			in:    "3:123#",
-			out:   123,
+			in:    "5:12345#",
+			out:   12345,
 		},
 		{
 			title: "negative",
-			in:    "4:-123#",
-			out:   -123,
+			in:    "6:-12345#",
+			out:   -12345,
 		},
 		{
 			title: "bigger size",
@@ -114,13 +114,13 @@ func TestDecoder_Decode_uint(t *testing.T) {
 		},
 		{
 			title: "positive",
-			in:    "3:123#",
-			out:   123,
+			in:    "5:12345#",
+			out:   12345,
 		},
 		{
 			title: "negative",
-			in:    "4:-123#",
-			err:   &strconv.NumError{Func: "ParseUint", Num: "-123", Err: strconv.ErrSyntax},
+			in:    "6:-12345#",
+			err:   &strconv.NumError{Func: "ParseUint", Num: "-12345", Err: strconv.ErrSyntax},
 		},
 		{
 			title: "bigger size",
@@ -162,13 +162,13 @@ func TestDecoder_Decode_float32(t *testing.T) {
 		},
 		{
 			title: "positive",
-			in:    "4:.123^",
-			out:   .123,
+			in:    "6:.12345^",
+			out:   .12345,
 		},
 		{
 			title: "negative",
-			in:    "5:-.123^",
-			out:   -.123,
+			in:    "7:-.12345^",
+			out:   -.12345,
 		},
 		{
 			title: "bigger size",

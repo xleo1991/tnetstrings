@@ -107,13 +107,13 @@ func decodeInteger(data []byte, rv reflect.Value) error {
 		}
 		rv.Set(reflect.ValueOf(i))
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		i, err := strconv.ParseInt(string(data), 0, int(rv.Type().Size()))
+		i, err := strconv.ParseInt(string(data), 0, 8*int(rv.Type().Size()))
 		if err != nil {
 			return err
 		}
 		rv.SetInt(i)
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		i, err := strconv.ParseUint(string(data), 0, int(rv.Type().Size()))
+		i, err := strconv.ParseUint(string(data), 0, 8*int(rv.Type().Size()))
 		if err != nil {
 			return err
 		}
@@ -136,7 +136,7 @@ func decodeFloat(data []byte, rv reflect.Value) error {
 		}
 		rv.Set(reflect.ValueOf(f))
 	case reflect.Float32, reflect.Float64:
-		f, err := strconv.ParseFloat(string(data), int(rv.Type().Size()))
+		f, err := strconv.ParseFloat(string(data), 8*int(rv.Type().Size()))
 		if err != nil {
 			return err
 		}
