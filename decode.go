@@ -36,7 +36,7 @@ func (d *Decoder) Decode(val interface{}) error {
 	data = data[:len(data)-1]
 	rv := reflect.Indirect(reflect.ValueOf(val))
 	switch t {
-	case ',':
+	case ',', ';':
 		return decodeString(data, rv)
 	case '#':
 		return decodeInteger(data, rv)
