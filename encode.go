@@ -25,7 +25,17 @@ func (e *Encoder) Encode(val interface{}) error {
 	switch v.Kind() {
 	case reflect.String:
 		s := val.(string)
-		_, err := fmt.Fprintf(e, "%d:%q;", len(s), s)
+		// _, err := fmt.Fprintf(e, "%d:%s;", len(d), d)
+		d := []byte(s)
+		_, err := fmt.Fprintf(e, "%d:", len(d))
+		if err != nil {
+			return err
+		}
+		_, err = e.Write(d)
+		if err != nil {
+			return err
+		}
+		_, err = fmt.Fprintf(e, ";")
 		return err
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64, reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		s := fmt.Sprintf("%d", val)
